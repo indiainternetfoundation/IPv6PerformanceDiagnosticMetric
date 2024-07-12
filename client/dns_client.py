@@ -1,6 +1,5 @@
 # Processing time too much!!!
 
-
 from scapy.all import UDP
 from pdm_exthdr import *
 from packet_utils import *
@@ -17,6 +16,9 @@ def _astons(delta, scale):
     ns_time /= 10000
     ns_time /= 100000
     return int(ns_time)
+
+def send_packet(packet : Ether):
+    s = socket.socket(socket.AF_INET6, socket.SOCK_RAW, socket.IPPROTO_RAW)
 
 def threaded(func):
     def wrapped_func(*args, **kwargs):
@@ -50,12 +52,14 @@ class NetworkAdaptar:
             sys.exit(0)
 
 class PDMHandler:
-    def __init__(self, _psntp = 13):
+    def __init__(self, net:NetworkAdaptar, _psntp = 13):
         self._psntp = _psntp
         self.tx = []
         self.rx = []
         self.dns_query = {}
         self._has_setup_ = False
+        self.adaptar = net
+        self.exit_next = False
 
     def __setup__(self):
         if not self._has_setup_:
@@ -83,24 +87,28 @@ class PDMHandler:
         pass
 
     def send(self, ipv6: IPv6):
-        self.tx.append(Ether((Ether() / ipv6).build()))
-        sr1(ipv6, timeout = 2, verbose=False, iface = "lo")
+        ethernet_frame = (Ether() / ipv6).build()
+        self.tx.append(Ether(ethernet_frame))
+        self.adaptar.sock.send( ethernet_frame )
 
     def tx_callback(self, ipv6: IPv6):
         if DNS in ipv6:
             self.dns_query[ipv6[DNS].id] = { "query": ipv6[DNS], "response": None, "tx_time": time.time_ns(), "rx_time": None }
 
     def rx_callback(self, ipv6: IPv6):
-        self.rx.append(Ether((Ether() / ipv6).build()))
+        ethernet_frame = (Ether() / ipv6).build()
+        self.rx.append(Ether(ethernet_frame))
 
-        while next_packet := analyze_and_create_next_packet(self.dns_query[ipv6[DNS].id], ipv6):
+        while next_packet := analyze_and_create_next_packet(self, self.dns_query[ipv6[DNS].id], ipv6):
             self.send(next_packet)
-            pass
+            if self.exit_next:
+                exit(0)
 
 
 
 
-def analyze_and_create_next_packet(q_details: dict, ipv6: IPv6):
+def analyze_and_create_next_packet(pdm_handler:PDMHandler, q_details: dict, ipv6: IPv6):
+    rx = time.perf_counter_ns()
     if ipv6:
         if IPv6ExtHdrDestOpt in ipv6:
             exthdr_destop = ipv6[IPv6ExtHdrDestOpt]
@@ -124,17 +132,17 @@ def analyze_and_create_next_packet(q_details: dict, ipv6: IPv6):
                     print("[i] RX : ", q_details['rx_time'], "ns")
                     print("[i] TX : ", q_details['tx_time'], "ns")
                     print("[i] Round Trip Time  : ", total_rtt, "ns")
+                    print("[ ]                    ", (total_rtt)/1000000000, "s")
                     print("[i] Round Trip Delay : ", total_rtt - server_latency, "ns")
                     print("[ ]                    ", (total_rtt - server_latency)/1000000000, "s")
-                    pass
-            exit(0)
-        pass
-    pass
+                    tx = time.perf_counter_ns()
+                    pdm_handler.exit_next = True
+                    print(packet_C(ipv6, tx - rx))
+                    return packet_C(ipv6, tx - rx)
 
-
-pdm_handler = PDMHandler()
 
 lo = NetworkAdaptar("lo")
+pdm_handler = PDMHandler(lo)
 lo.listen(
     callback = pdm_handler,
     filter = lambda x: IPv6 in x

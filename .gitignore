@@ -50,3 +50,10 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# pycache
+__pycache__/
+
+# Hidden Files
+.*
+.*.*

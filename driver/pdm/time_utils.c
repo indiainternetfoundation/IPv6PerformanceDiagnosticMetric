@@ -25,10 +25,25 @@ static struct time _nstoas(uint64_t delta_ns){
     //           `----------------------'  `-------'
     //                  nanosecond to      Remove the
     //                   attosecond        last 2 bytes
-    atto_now = (atto_now * 100000) / (16*16);
-    atto_now *= 10000;
+    // atto_now = (atto_now * 100000) / (16*16);
+    // atto_now *= 10000;
 
-    uint8_t scale = 8;         // Removed last 3 bytes = removed last 3*4 = 12 bits
+    // atto_now = (atto_now * 1000) / 16;
+    // atto_now *= 1000;
+    // atto_now /= 16;
+    // atto_now *= 1000;
+
+    // pr_debug("hex(atto_now) ='0x%llx'", atto_now);
+    // atto_now >>= 16;
+    atto_now *= 1000;
+    atto_now >>= 16;
+    atto_now *= 1000;
+    atto_now *= 1000;
+
+    // pr_debug("hex(atto_now) ='0x%llx'", atto_now);
+
+    // uint8_t scale = 8 + 16 + 16;         // Removed last 3 bytes = removed last 3*4 = 12 bits
+    uint8_t scale = 16;         // Removed last 3 bytes = removed last 3*4 = 12 bits
 
     while(countBits(atto_now) > 16) {
         atto_now >>= 1;
@@ -52,8 +67,8 @@ static uint64_t _astons(struct time timedelta){
 }
 
 static void __dump_time(struct time _time){
-    printk("static struct time {");
-    printk("    uint16_t delta : %x;", _time.delta);
-    printk("    uint8_t scale : %u;", _time.scale);
-    printk("}");
+    pr_debug("static struct time {");
+    pr_debug("    uint16_t delta : %x;", _time.delta);
+    pr_debug("    uint8_t scale : %u;", _time.scale);
+    pr_debug("}");
 }

@@ -1,6 +1,6 @@
 
 #include <linux/module.h>    // included for all kernel modules
-#include <linux/kernel.h>    // included for KERN_INFO
+#include <linux/kernel.h>    // included for KERN_DEBUG
 #include <linux/init.h>      // included for __init and __exit macros
 #include <linux/vmalloc.h>
 
@@ -16,6 +16,7 @@
 #include <linux/tcp.h>
 #include <linux/udp.h>
 #include <linux/time.h>
+// #include <linux/inet6.h>
 #include <linux/sysfs.h>
 #include <linux/fs.h>
 #include <linux/random.h>
@@ -23,27 +24,29 @@
 #include <linux/slab.h>
 #include <linux/ktime.h>
 
+#include <linux/proc_fs.h>	/* Necessary because we use the proc fs */
+
 #include "kreg.h"
 // #include "kreg.c"
 // #include "pdm/ipv6.c"
 #include "pdm/pdm.c"
 #include "pdm/proto_utils.c"
 #include "pdm/time_utils.c"
-// #include "pdm/utils.c"
+#include "finreg.h"
 
-static int debug = 0;
+
+#define PROCFS_MAX_SIZE		1024
+#define PROCFS_NAME 		"pdm_buffer"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Arnav Das");
 MODULE_DESCRIPTION("IPv6 Performance and Diagnostic Metrics (PDM) Destination Option");
 
+static int debug = 0;
+module_param(debug, int, 0660);
+
 static unsigned int handle_tx_pkt( void *priv, struct sk_buff *skb, const struct nf_hook_state *state)  {
     struct ipv6hdr *ip6h = ipv6_hdr(skb);
-
-    // printk(",--------------- TX -----------------,");
-    // print_hex_dump(KERN_DEBUG, "[ TX ] ", DUMP_PREFIX_OFFSET, 8, 1, ip6h, skb_tail_pointer(skb) - skb->data, 1);
-    // printk("'------------------------------------'");
-
 
     struct protoid protocol_id;
     populate_protocol_type(&protocol_id, ip6h, 0);
@@ -52,24 +55,22 @@ static unsigned int handle_tx_pkt( void *priv, struct sk_buff *skb, const struct
     if(debug)
         __dump_protoid(protocol_id);
 
-    struct pdm_segmented_key_array pdm_element = kreg_fetch(protocol_id.proto_id_value, protocol_id.proto_type);
+    struct pdm_segmented_key_array pdm_element = kreg_pop(protocol_id.proto_id_value, protocol_id.proto_type);
 
     if (debug){
-        printk("struct pdm_segmented_key_array pdm_element = {");
-        printk("    .id_value = %u,", pdm_element.id_value);
-        printk("    .time = %llu,", pdm_element.time);
-        printk("    .psntp = %u,", pdm_element.psntp);
-        printk("    .proto_type = %u", pdm_element.proto_type);
-        printk("};");
+        pr_debug("struct pdm_segmented_key_array pdm_element = {");
+        pr_debug("    .id_value = %u,", pdm_element.id_value);
+        pr_debug("    .time = %llu,", pdm_element.time);
+        pr_debug("    .psntp = %u,", pdm_element.psntp);
+        pr_debug("    .proto_type = %u", pdm_element.proto_type);
+        pr_debug("};");
     }
-
 
     int psntp = 0x00;
     get_random_bytes(&psntp, sizeof(psntp));
     uint64_t tlr = ktime_get_real_ns() - pdm_element.time;
     struct time _time = _nstoas(tlr);
-    printk("Time Last Received : %llu", tlr);
-    printk("Time Last Received : 0x%llx", tlr);
+
 
     uint8_t PDM_EXTHDR_SIZE = 16;
 
@@ -109,7 +110,7 @@ static unsigned int handle_tx_pkt( void *priv, struct sk_buff *skb, const struct
     pdm_dstopt->opttype = 0x0F;
     pdm_dstopt->optdatalen = 0x0A;
     pdm_dstopt->psntp = psntp;
-    pdm_dstopt->psnlr = (uint16_t) htons(psntp);
+    pdm_dstopt->psnlr = (uint16_t) htons(pdm_element.psntp);
     pdm_dstopt->deltatlr = (uint16_t) htons(_time.delta);
     pdm_dstopt->scaledtlr = _time.scale;
     pdm_dstopt->deltatls = 0x00;
@@ -127,14 +128,17 @@ static unsigned int handle_tx_pkt( void *priv, struct sk_buff *skb, const struct
     ip6h->nexthdr = 60;
     ip6h->payload_len = ip6h->payload_len + PDM_EXTHDR_SIZE;
 
+    // 7.) Record the tx to calculate the RTT and RTD, at packet 3
+    // if (debug)
+
+    if ( !push_report_reg( psntp,  ktime_get_real_ns() ) ) {
+        pr_err("Unable to push the PDM in the finreg queue.");
+    }
+
     return NF_ACCEPT;
 }
 static unsigned int handle_rx_pkt( void *priv, struct sk_buff *skb, const struct nf_hook_state *state)  {
     struct ipv6hdr *ip6h = ipv6_hdr(skb);
-
-    // printk(",--------------- RX -----------------,");
-    // print_hex_dump(KERN_DEBUG, "[ RX ] ", DUMP_PREFIX_OFFSET, 8, 1, ip6h, skb_tail_pointer(skb) - skb->data, 1);
-    // printk("'------------------------------------'");
 
     unsigned char *pdm_packet_pointer = ipv6_pdm_hdr(skb, 0);
 
@@ -155,13 +159,6 @@ static unsigned int handle_rx_pkt( void *priv, struct sk_buff *skb, const struct
         if (!psnlr){
             // Got Packet 1
 
-            // Strip PDM Header
-            // if (debug)
-            //     printk("Striping PDM Destination Option Extension Header");
-            // size_t new_size = strip_destination_option(ip6h, skb_tail_pointer(skb) - skb->data, 0);
-            // if (debug)
-            //     print_hex_dump(KERN_DEBUG, "[ NX ] ", DUMP_PREFIX_OFFSET, 8, 1, ip6h, new_size, 1);
-
             // Identify the protocol and its identifier
             struct protoid protocol_id;
             populate_protocol_type(&protocol_id, ip6h, 0);
@@ -178,7 +175,7 @@ static unsigned int handle_rx_pkt( void *priv, struct sk_buff *skb, const struct
             };
 
             if (debug)
-                printk("Pushing PDM Entry (%d) at %d : %llx", psntp, IDX(pdm_element.id_value, protocol_id.proto_type), pdm_element.time);
+                pr_debug("Pushing PDM Entry (%d) at %d : %llx", psntp, IDX(pdm_element.id_value, protocol_id.proto_type), pdm_element.time);
             if ( !kreg_push( protocol_id.proto_id_value, protocol_id.proto_type, pdm_element )) {
                 pr_err("Unable to push the PDM as well as the protocol identifier in the kreg queue.");
             }
@@ -188,20 +185,35 @@ static unsigned int handle_rx_pkt( void *priv, struct sk_buff *skb, const struct
             // Got Packet 2
         }else {
             // Got Packet 3
+            uint64_t rx = ktime_get_real_ns();
+            pr_debug("pdm_packet->psnlr : %llu", pdm_packet->psnlr);
+
+            struct time tls_time = {
+                .delta = pdm_packet->deltatls,
+                .scale = pdm_packet->scaledtls
+            };
+            uint64_t tls = _astons(tls_time);
+
+            // print_report_reg();
+            // uint64_t nowrtt = ktime_get_real_ns();
+            // uint64_t rtt = nowrtt - fetch_report_reg(pdm_packet->psnlr);
+            uint64_t rtt = ktime_get_real_ns() - pop_report_reg(pdm_packet->psnlr);
+            uint64_t rtd = rtt-tls;
+            // pr_info("RTT : %llu - %llu ns", nowrtt, pop_report_reg(pdm_packet->psnlr));
+            // pr_info("      %llu ns", rtt);
+            // pr_info("RTD : %llu - %llu ns", rtt, tls);
+            // pr_info("      %llu ns", rtt - tls);
+
+            pr_info("Performance and Diagnostic Metrics//{'saddr': '%pI6', 'rtt': '%llu ns', 'rtd': '%llu ns'}", &ipv6_hdr(skb)->saddr, rtt, rtt - tls);
+            // pr_info("{");
+            // pr_info("    'saddr': '%pI6',", &ipv6_hdr(skb)->saddr);
+            // pr_info("    'rtt': '%llu',", rtt);
+            // pr_info("    'rtd': '%llu',", rtd);
+            // pr_info("}");
+            pr_info("");
+            // print_report_reg();
         }
-        // suppose time datatype is ktime_t
-        // (struct map_queue) *queue = init_map_queue(64, sizeof(ktime_t)) // Maximum 64 elements buffer
-        //
-        // If First packet received :
-        // Note: Note the rx time of packet
-        // push(queue, pdm_packet->psntp, current_time);
-        // When Second packet transmitting :
-        // Note: Fetch the rx time of packet, along with new pdm id
-        // ktime_t *rx_time_pt = fetch(queue, pdm_packet->psntp);
-        // int deltalr = current_time - *rx_time_pt;
-        // new_psn = (rx_time_pt - queue + offset);
-        // If Second packet received :
-        // If Third packet received :
+
     }
     return NF_ACCEPT;
 }
@@ -221,60 +233,9 @@ static struct nf_hook_ops rx_hook_ops = {
 };
 
 static int __init ipv6_pdm_init(void) {
-    printk(KERN_INFO "Starting PDM listener...\n");
-
-
-    // printk(",----------------- TEST ---------------------,");
-    // struct time _time = _nstoas(ktime_get_real_ns());
-
-
-    // /*
-    //     atto_now: 0x732e8fe0
-    //     static struct time {
-    //         uint16_t delta : 8d88;
-    //         uint8_t scale : 44;
-    //     }
-    //  */
-    // struct time _time = _nstoas(0x9b9e * 1000);
-    // __dump_time(_time);
-
-
-
-    // /*
-    //     atto_now: 0xcae81200
-    //     static struct time {
-    //         uint16_t delta : e033;
-    //         uint8_t scale : 49;
-    //     }
-    // */
-    // _time = _nstoas(0x785E3D500);
-    // __dump_time(_time);
-
-
-
-    // /*
-    //     atto_now: 0x1af62c00
-    //     static struct time {
-    //         uint16_t delta : a688;
-    //         uint8_t scale : 46;
-    //     }
-    // */
-    // _time = _nstoas(3000000000);
-    // __dump_time(_time);
-
-
-
-    // struct time _time = _nstoas(3 * 1000000000);
-    // printk("Time : %llx", _astons(_time) / 1000);
-    // printk("'----------------- TEST ---------------------'");
+    pr_debug(KERN_DEBUG "Starting PDM listener...\n");
 
     kreg_init();
-
-    // kreg_push(13, 2, 0x13a1e8572e95);
-    // kreg_push(13, 0x13a1e857e3aa);
-    // kreg_push(14, 0x13a1e857e3aa);
-
-    // printk_kreg();
 
     // Register Receiving and Transmission hooks
     nf_register_net_hook(&init_net, &tx_hook_ops);
@@ -286,10 +247,9 @@ static void __exit ipv6_pdm_cleanup(void) {
     nf_unregister_net_hook(&init_net, &tx_hook_ops);
     nf_unregister_net_hook(&init_net, &rx_hook_ops);
 
-    // printk_kreg();
     kreg_destroy();
 
-    printk(KERN_INFO "Cleaning up module.\n");
+    pr_debug(KERN_DEBUG "Cleaning up module.\n");
 }
 
 module_init(ipv6_pdm_init);

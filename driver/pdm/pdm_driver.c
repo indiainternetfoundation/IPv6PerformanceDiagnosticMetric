@@ -45,7 +45,7 @@ static unsigned char *ipv6_pdm_hdr(struct sk_buff *skb);
 static unsigned char *ipv6_pdm_hdr(struct sk_buff *skb){
     struct ipv6hdr *ip6h = ipv6_hdr(skb);
     __u8 nexthdr = ip6h->nexthdr;
-    printk("nexthdr: %u i.e. %d", nexthdr, nexthdr);
+    pr_debug("nexthdr: %u i.e. %d", nexthdr, nexthdr);
     unsigned char *hdr_pointer = skb->data;
     struct dst_exthdr *deh = (struct dst_exthdr *) (hdr_pointer + sizeof(struct ipv6hdr));
 

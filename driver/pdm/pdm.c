@@ -53,7 +53,7 @@ static unsigned char *ipv6_pdm_hdr(struct sk_buff *skb, int debug){
         if (nh == 0x3c)
         {
             if(debug){
-                printk("Found Destination Option.");
+                pr_debug("Found Destination Option.");
                 __dump_exthdr(hdr_ptr);
             }
             // Detected Destination Header
@@ -119,7 +119,7 @@ static size_t strip_destination_option(struct ipv6hdr *ip6h, unsigned int pkt_le
             }
 
             if(debug)
-                printk("Found Destination Option.");
+                pr_debug("Found Destination Option.");
             if(debug)
                 __dump_exthdr(hdr_ptr);
 
@@ -147,10 +147,10 @@ static size_t strip_destination_option(struct ipv6hdr *ip6h, unsigned int pkt_le
             if(found_pdm){
 
                 if(debug){
-                    printk("=== OBJECTS DEBUG DURING STRIP ===");
+                    pr_debug("=== OBJECTS DEBUG DURING STRIP ===");
                     __dump_exthdr((unsigned char *)destination_option_hdr);
                     __dump_exthdr_opt(option);
-                    printk("=== OBJECTS DEBUG DURING STRIP ===");
+                    pr_debug("=== OBJECTS DEBUG DURING STRIP ===");
                 }
 
                 strip.dlen = (option_ptr - dst_ptr);
@@ -162,10 +162,10 @@ static size_t strip_destination_option(struct ipv6hdr *ip6h, unsigned int pkt_le
                 __dump_strip(&strip);
 
                // ip6h->payload_len -= strip.dlen;
-               printk("ip6h->payload_len : %x", ntohs(ip6h->payload_len));
-               printk("strip.dlen : %x", strip.dlen);
+               pr_debug("ip6h->payload_len : %x", ntohs(ip6h->payload_len));
+               pr_debug("strip.dlen : %x", strip.dlen);
                ip6h->payload_len = htons(ntohs(ip6h->payload_len) - strip.dlen);
-               printk("ip6h->payload_len : %x", ntohs(ip6h->payload_len));
+               pr_debug("ip6h->payload_len : %x", ntohs(ip6h->payload_len));
 
                if (strip.parent_type == 0x0){
                     // Parent is IPv6
@@ -190,22 +190,22 @@ static size_t strip_destination_option(struct ipv6hdr *ip6h, unsigned int pkt_le
 
 
 void __dump_pdm_packet(struct __pdm* pdm_packet){
-    printk("struct __pdm {");
-    printk("\t\tu_int8_t  opttype : %x;", pdm_packet->opttype);
-    printk("\t\tu_int8_t  optdatalen : %x;", pdm_packet->optdatalen);
-    printk("\t\tu_int8_t  scaledtlr : %x;", pdm_packet->scaledtlr);
-    printk("\t\tu_int8_t  scaledtls : %x;", pdm_packet->scaledtls);
-    printk("\t\tu_int16_t psntp : %x;", ntohl(pdm_packet->psntp));
-    printk("\t\tu_int16_t psnlr : %x;", ntohl(pdm_packet->psnlr));
-    printk("\t\tu_int16_t deltatlr : %x;", ntohs(pdm_packet->deltatlr));
-    printk("\t\tu_int16_t deltatls : %x;", ntohs(pdm_packet->deltatls));
-    printk("}");
+    pr_debug("struct __pdm {");
+    pr_debug("\t\tu_int8_t  opttype : %x;", pdm_packet->opttype);
+    pr_debug("\t\tu_int8_t  optdatalen : %x;", pdm_packet->optdatalen);
+    pr_debug("\t\tu_int8_t  scaledtlr : %x;", pdm_packet->scaledtlr);
+    pr_debug("\t\tu_int8_t  scaledtls : %x;", pdm_packet->scaledtls);
+    pr_debug("\t\tu_int16_t psntp : %x;", ntohl(pdm_packet->psntp));
+    pr_debug("\t\tu_int16_t psnlr : %x;", ntohl(pdm_packet->psnlr));
+    pr_debug("\t\tu_int16_t deltatlr : %x;", ntohs(pdm_packet->deltatlr));
+    pr_debug("\t\tu_int16_t deltatls : %x;", ntohs(pdm_packet->deltatls));
+    pr_debug("}");
 }
 void __dump_strip(struct strip_ipv6_exthdr* strip){
-    printk("struct strip_ipv6_exthdr{");
-    printk("\t\tchar*    parent : %x;", strip->parent);
-    printk("\t\tsize_t   dlen : %d;", strip->dlen);
-    printk("\t\tu_int8_t nh : %x;", strip->nh);
-    printk("\t\tu_int8_t parent_type : %d;", strip->parent_type);
-    printk("};");
+    pr_debug("struct strip_ipv6_exthdr{");
+    pr_debug("\t\tchar*    parent : %x;", strip->parent);
+    pr_debug("\t\tsize_t   dlen : %d;", strip->dlen);
+    pr_debug("\t\tu_int8_t nh : %x;", strip->nh);
+    pr_debug("\t\tu_int8_t parent_type : %d;", strip->parent_type);
+    pr_debug("};");
 }

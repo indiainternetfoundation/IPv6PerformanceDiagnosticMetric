@@ -13,7 +13,7 @@ static void pkt_hex_dump(struct sk_buff *skb)
     int li = 0;
     uint8_t *data, ch;
 
-    // printk("Packet hex dump:\n");
+    // pr_debug("Packet hex dump:\n");
     // data = (uint8_t *) skb_mac_header(skb);
 
     if (skb_is_nonlinear(skb)) {
@@ -22,8 +22,8 @@ static void pkt_hex_dump(struct sk_buff *skb)
         len = skb->len;
     }
 
-    // printk("%06d\t", li);
-    // printk(KERN_CONT "%02X ", (uint32_t) ch);
+    // pr_debug("%06d\t", li);
+    // pr_debug(KERN_CONT "%02X ", (uint32_t) ch);
 
     print_hex_dump(KERN_DEBUG, "", DUMP_PREFIX_OFFSET, 16, 1, skb->data, len, true);
     // print_hex_dump(KERN_DEBUG, "raw data: ", DUMP_PREFIX_OFFSET, 16, 1, skb->data, len, true);
@@ -32,20 +32,20 @@ static void pkt_hex_dump(struct sk_buff *skb)
 
     // remaining = len;
     // for (i = 0; i < len; i += rowsize) {
-    //     printk("%06d\t", li);
+    //     pr_debug("%06d\t", li);
 
     //     linelen = min(remaining, rowsize);
     //     remaining -= rowsize;
 
     //     for (l = 0; l < linelen; l++) {
     //         ch = data[l];
-    //         printk(KERN_CONT "%02X ", (uint32_t) ch);
+    //         pr_debug(KERN_CONT "%02X ", (uint32_t) ch);
     //     }
 
     //     data += linelen;
     //     li += 10;
 
-    //     printk(KERN_CONT "\n");
+    //     pr_debug(KERN_CONT "\n");
     // }
 }
 void remove_section(unsigned char *array, size_t length, unsigned char *start_ptr, unsigned char *end_ptr) {
@@ -55,7 +55,7 @@ void remove_section(unsigned char *array, size_t length, unsigned char *start_pt
 
     // Validate the indices
     if (start_index >= length || end_index >= length || start_index > end_index) {
-        printk("Invalid start or end pointers.\n");
+        pr_debug("Invalid start or end pointers.\n");
         return;
     }
 

@@ -55,7 +55,7 @@ static uint8_t populate_protocol_type(struct protoid *protocol_id, struct ipv6hd
                 option_ptr += sizeof(struct destopt_op) + option->optdatalen + PADDING;
             }
             if(debug)
-                printk("nh: %d", nh);
+                pr_debug("nh: %d", nh);
             hdr_ptr = option_ptr;
             ext = destination_option_hdr;
             nh = ext->nh;
@@ -66,7 +66,7 @@ static uint8_t populate_protocol_type(struct protoid *protocol_id, struct ipv6hd
         // {
         //     case IPPROTO_UDP:
         //         if(debug)
-        //             printk("UDP Packet Found");
+        //             pr_debug("UDP Packet Found");
         //         protocol_id->proto = get_next_exthdr(hdr_ptr);
         //         struct udphdr *udp = (struct udphdr *)protocol_id->proto;
         //         if(debug)
@@ -85,7 +85,7 @@ static uint8_t populate_protocol_type(struct protoid *protocol_id, struct ipv6hd
         {
             case IPPROTO_UDP:
                 if(debug)
-                    printk("UDP Packet Found");
+                    pr_debug("UDP Packet Found");
                 protocol_id->proto = hdr_ptr;
                 struct udphdr *udp = (struct udphdr *)protocol_id->proto;
                 if(debug)
@@ -124,10 +124,10 @@ static void populate_with_dns_data(struct protoid *protocol_id, struct dns_struc
     protocol_id->proto_id_value = htons(dns_header->id);
 }
 static void __dump_protoid(struct protoid proto_id){
-    printk("static struct protoid {");
-    printk("    uint8_t     proto_type : %u;", proto_id.proto_type);
-    printk("    char*       proto_id_name : %s;", proto_id.proto_id_name);
-    printk("    uint64_t    proto_id_value : %llu;", proto_id.proto_id_value);
-    printk("    unsigned char* proto : %p;", proto_id.proto);
-    printk("};");
+    pr_debug("static struct protoid {");
+    pr_debug("    uint8_t     proto_type : %u;", proto_id.proto_type);
+    pr_debug("    char*       proto_id_name : %s;", proto_id.proto_id_name);
+    pr_debug("    uint64_t    proto_id_value : %llu;", proto_id.proto_id_value);
+    pr_debug("    unsigned char* proto : %p;", proto_id.proto);
+    pr_debug("};");
 }
