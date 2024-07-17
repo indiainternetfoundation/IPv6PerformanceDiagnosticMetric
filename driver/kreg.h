@@ -70,7 +70,7 @@ static int kreg_push(int key, int segment, K_REG_DT value) {
     if ( are_equal(KREG[IDX(key, segment)], value ) )
         // Success
         return 1;
-    return NULL;
+    return -1;
 }
 static K_REG_DT kreg_fetch(int key, int segment) {
     return KREG[IDX(key, segment)];
@@ -83,11 +83,11 @@ static K_REG_DT kreg_pop(int key, int segment) {
 static int kreg_destroy() {
 
     // Free the allocated memory
-    if (KREG) {
+    if (KREG != NULL) {
         kfree(KREG);
         KREG = NULL;
     }
-    if (KREG_NULL) {
+    if (KREG_NULL != NULL) {
         kfree(KREG_NULL);
         KREG_NULL = NULL;
     }

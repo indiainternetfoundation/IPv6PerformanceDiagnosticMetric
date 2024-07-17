@@ -49,11 +49,16 @@ static unsigned int handle_tx_pkt( void *priv, struct sk_buff *skb, const struct
     struct ipv6hdr *ip6h = ipv6_hdr(skb);
 
     struct protoid protocol_id;
-    populate_protocol_type(&protocol_id, ip6h, 0);
+    if(populate_protocol_type(&protocol_id, ip6h, 0) == -1)
+        return NF_ACCEPT;
+
     populate_protocol_id(&protocol_id);
 
     if(debug)
         __dump_protoid(protocol_id);
+
+    if(is_null(kreg_fetch(protocol_id.proto_id_value, protocol_id.proto_type)))
+        return NF_ACCEPT;
 
     struct pdm_segmented_key_array pdm_element = kreg_pop(protocol_id.proto_id_value, protocol_id.proto_type);
 
@@ -93,11 +98,28 @@ static unsigned int handle_tx_pkt( void *priv, struct sk_buff *skb, const struct
     // Get the ipv6 header
     ip6h = ipv6_hdr(skb);
 
-    // 2.) Shift ipv6hdr to udp
+    // // 2.) Shift ipv6hdr to udp
     unsigned long long ip6h_ptr = (unsigned long long)ip6h;
+
+    // (1)
+    //                             ,---  ipv6_payload  ---,
+    // +--------------------------+-----------------------+
+    // |         IPv6             |     ... data ...      |
+    // +--------------------------+-----------------------+
+    // |                          |
+    //  `- ip6h_ptr                `- ip6h_ptr + sizeof(struct ipv6hdr)
+
+    // (2)
+    //                                     ,---  ipv6_payload  ---,
+    // +--------------------------+-------+-----------------------+
+    // |         IPv6             |0000000|     ... data ...      |
+    // +--------------------------+-------+-----------------------+
+    // |                                  |
+    //  `- ip6h_ptr                        `- ip6h_ptr + sizeof(struct ipv6hdr) + PDM_EXTHDR_SIZE
 
     memmove(ip6h_ptr + sizeof(struct ipv6hdr) + PDM_EXTHDR_SIZE, ip6h_ptr + sizeof(struct ipv6hdr), ipv6_payload);
     memset(ip6h_ptr + sizeof(struct ipv6hdr), 0, PDM_EXTHDR_SIZE);
+
 
     // 3.) Load the new blank space as exthdr and pdm
     struct exthdr *pdm_dsthdr = (struct exthdr *) (ip6h_ptr + sizeof(struct ipv6hdr));
@@ -116,21 +138,18 @@ static unsigned int handle_tx_pkt( void *priv, struct sk_buff *skb, const struct
     pdm_dstopt->deltatls = 0x00;
     pdm_dstopt->scaledtls = 0x00;
 
-    // get_random_bytes(pdm_dstopt->psntp, sizeof(u_int16_t));
     if(debug)
         __dump_time(_time);
     if(debug)
         __dump_pdm_packet(pdm_dstopt);
 
-    // 5.) Set Padding
+    // // 5.) Set Padding
 
     // 6.) Overwrite the ipv6hdr fields.
     ip6h->nexthdr = 60;
-    ip6h->payload_len = ip6h->payload_len + PDM_EXTHDR_SIZE;
+    ip6h->payload_len =  htons( ntohs(ip6h->payload_len) + PDM_EXTHDR_SIZE);
 
     // 7.) Record the tx to calculate the RTT and RTD, at packet 3
-    // if (debug)
-
     if ( !push_report_reg( psntp,  ktime_get_real_ns() ) ) {
         pr_err("Unable to push the PDM in the finreg queue.");
     }
@@ -138,6 +157,7 @@ static unsigned int handle_tx_pkt( void *priv, struct sk_buff *skb, const struct
     return NF_ACCEPT;
 }
 static unsigned int handle_rx_pkt( void *priv, struct sk_buff *skb, const struct nf_hook_state *state)  {
+
     struct ipv6hdr *ip6h = ipv6_hdr(skb);
 
     unsigned char *pdm_packet_pointer = ipv6_pdm_hdr(skb, 0);
@@ -161,7 +181,9 @@ static unsigned int handle_rx_pkt( void *priv, struct sk_buff *skb, const struct
 
             // Identify the protocol and its identifier
             struct protoid protocol_id;
-            populate_protocol_type(&protocol_id, ip6h, 0);
+            if(populate_protocol_type(&protocol_id, ip6h, 0) == -1) {
+                return NF_ACCEPT;
+            }
             populate_protocol_id(&protocol_id);
 
             if(debug)
@@ -176,44 +198,46 @@ static unsigned int handle_rx_pkt( void *priv, struct sk_buff *skb, const struct
 
             if (debug)
                 pr_debug("Pushing PDM Entry (%d) at %d : %llx", psntp, IDX(pdm_element.id_value, protocol_id.proto_type), pdm_element.time);
-            if ( !kreg_push( protocol_id.proto_id_value, protocol_id.proto_type, pdm_element )) {
+            if ( kreg_push( protocol_id.proto_id_value, protocol_id.proto_type, pdm_element ) == -1) {
                 pr_err("Unable to push the PDM as well as the protocol identifier in the kreg queue.");
             }
 
-
-        } else if (scaledtlr){
-            // Got Packet 2
-        }else {
-            // Got Packet 3
-            uint64_t rx = ktime_get_real_ns();
-            pr_debug("pdm_packet->psnlr : %llu", pdm_packet->psnlr);
-
-            struct time tls_time = {
-                .delta = pdm_packet->deltatls,
-                .scale = pdm_packet->scaledtls
-            };
-            uint64_t tls = _astons(tls_time);
-
-            // print_report_reg();
-            // uint64_t nowrtt = ktime_get_real_ns();
-            // uint64_t rtt = nowrtt - fetch_report_reg(pdm_packet->psnlr);
-            uint64_t rtt = ktime_get_real_ns() - pop_report_reg(pdm_packet->psnlr);
-            uint64_t rtd = rtt-tls;
-            // pr_info("RTT : %llu - %llu ns", nowrtt, pop_report_reg(pdm_packet->psnlr));
-            // pr_info("      %llu ns", rtt);
-            // pr_info("RTD : %llu - %llu ns", rtt, tls);
-            // pr_info("      %llu ns", rtt - tls);
-
-            pr_info("Performance and Diagnostic Metrics//{'saddr': '%pI6', 'rtt': '%llu ns', 'rtd': '%llu ns'}", &ipv6_hdr(skb)->saddr, rtt, rtt - tls);
-            // pr_info("{");
-            // pr_info("    'saddr': '%pI6',", &ipv6_hdr(skb)->saddr);
-            // pr_info("    'rtt': '%llu',", rtt);
-            // pr_info("    'rtd': '%llu',", rtd);
-            // pr_info("}");
-            pr_info("");
-            // print_report_reg();
         }
+        //  else if (scaledtlr){
+        //     // Got Packet 2
+        // }else {
+        //     // Got Packet 3
+        //     uint64_t rx = ktime_get_real_ns();
+        //     pr_debug("pdm_packet->psnlr : %llu", pdm_packet->psnlr);
 
+        //     struct time tls_time = {
+        //         .delta = pdm_packet->deltatls,
+        //         .scale = pdm_packet->scaledtls
+        //     };
+        //     uint64_t tls = _astons(tls_time);
+
+        //     // print_report_reg();
+        //     // uint64_t nowrtt = ktime_get_real_ns();
+        //     // uint64_t rtt = nowrtt - fetch_report_reg(pdm_packet->psnlr);
+        //     uint64_t rtt = ktime_get_real_ns() - pop_report_reg(pdm_packet->psnlr);
+        //     uint64_t rtd = rtt-tls;
+        //     // pr_info("RTT : %llu - %llu ns", nowrtt, pop_report_reg(pdm_packet->psnlr));
+        //     // pr_info("      %llu ns", rtt);
+        //     // pr_info("RTD : %llu - %llu ns", rtt, tls);
+        //     // pr_info("      %llu ns", rtt - tls);
+
+        //     pr_info("Performance and Diagnostic Metrics//{'saddr': '%pI6', 'rtt': '%llu ns', 'rtd': '%llu ns'}", &ipv6_hdr(skb)->saddr, rtt, rtt - tls);
+        //     // pr_info("{");
+        //     // pr_info("    'saddr': '%pI6',", &ipv6_hdr(skb)->saddr);
+        //     // pr_info("    'rtt': '%llu',", rtt);
+        //     // pr_info("    'rtd': '%llu',", rtd);
+        //     // pr_info("}");
+        //     pr_info("");
+        //     // print_report_reg();
+        // }
+
+    } else {
+        printk("No PDM Packet Found!! NF_ACCEPT");
     }
     return NF_ACCEPT;
 }

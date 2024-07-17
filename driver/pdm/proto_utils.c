@@ -98,6 +98,8 @@ static uint8_t populate_protocol_type(struct protoid *protocol_id, struct ipv6hd
                 return 0;
             case IPPROTO_TCP:
                 return -1;
+            default:
+                return -1;
         }
 
         // Go to next extension header...
@@ -112,9 +114,10 @@ static int8_t populate_protocol_id(struct protoid *protocol_id ){
     switch (protocol_id->proto_type){
         case IPPROTO_DNS:
             populate_with_dns_data(protocol_id, (struct dns_struct *)protocol_id->proto);
-        case IPPROTO_TCPSYN:
-        case IPPROTO_TCPACK:
-        case IPPROTO_TCPSYNACK:
+        // case IPPROTO_TCPSYN:
+        // case IPPROTO_TCPACK:
+        // case IPPROTO_TCPSYNACK:
+        default:
             return -1;
     }
     return 0;
