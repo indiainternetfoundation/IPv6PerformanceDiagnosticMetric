@@ -1,6 +1,11 @@
 from scapy.all import IPv6, ICMPv6EchoRequest, IPv6ExtHdrDestOpt, HBHOptUnknown, sr1, Jumbo, UDP
 from pdm_exthdr import *
 
+# DST = "::1"
+# SRC  =  "2406:da1a:8e8:e8f4:9959:7a8b:38d6:c1dc"
+# DST = "2406:da1a:8e8:e805:6d97:b1b6:6232:ff90"
+DST = "fe80::f8:39ff:fed4:34cf%enX0"
+
 def countBits(n):
     count = 0;
     while(n):
@@ -19,7 +24,7 @@ def _nstoas(delta_ns):
 
 def packet_A(_psntp):
     _ip = IPv6()
-    _ip.dst = "::1"
+    _ip.dst = DST
 
     _ipv6_pdm_destination_option = IPv6ExtHdrDestOpt(
         options = Destination_Options_PerformanceDiagnosticMetrics(
@@ -45,7 +50,7 @@ def packet_C(packet_B, delta_ns):
     _pdm = IPv6ExtHdrPerformanceDiagnosticMetrics( packet_B.options[0].optdata )
     delta, scale = _nstoas(delta_ns)
     _ip = IPv6()
-    _ip.dst = "::1"
+    _ip.dst = DST
 
     _ipv6_pdm_destination_option = IPv6ExtHdrDestOpt(
         options = Destination_Options_PerformanceDiagnosticMetrics(

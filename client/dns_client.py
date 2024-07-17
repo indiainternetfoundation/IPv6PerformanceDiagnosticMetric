@@ -1,6 +1,6 @@
 # Processing time too much!!!
 
-from scapy.all import UDP
+from scapy.all import UDP, IPv6, ICMPv6DestUnreach
 from pdm_exthdr import *
 from packet_utils import *
 from struct import unpack
@@ -45,8 +45,9 @@ class NetworkAdaptar:
             while self.listening:
                 data = self.sock.recv(self.mtu) # buffer size is 1024 bytes
                 _packet = Ether(data)
-                if filter(_packet):
-                    callback(_packet)
+                if IPv6 in _packet:
+                    if filter(_packet):
+                        callback(_packet)
         except KeyboardInterrupt:
             self.listening = False
             sys.exit(0)
@@ -70,7 +71,12 @@ class PDMHandler:
             self._has_setup_ = True
 
     def __call__(self, ethernet_frame):
-        print(f"[i] {'[ TX ]' if ethernet_frame in self.tx else '[ RX ]'} {ethernet_frame.summary()}")
+        if ICMPv6DestUnreach in ethernet_frame:
+            return
+        if DNS in ethernet_frame:
+            print(f"[i] {'[ TX ]' if ethernet_frame in self.tx else '[ RX ]'} {ethernet_frame.summary()}")
+        else:
+            return
         if ethernet_frame not in self.tx:
             ipv6 = ethernet_frame[IPv6]
             if DNS in ipv6:
@@ -88,17 +94,23 @@ class PDMHandler:
 
     def send(self, ipv6: IPv6):
         ethernet_frame = (Ether() / ipv6).build()
-        self.tx.append(Ether(ethernet_frame))
+        # self.tx.append(Ether(ethernet_frame))
+        self.tx_callback(Ether(ethernet_frame)[IPv6])
         self.adaptar.sock.send( ethernet_frame )
 
     def tx_callback(self, ipv6: IPv6):
-        if DNS in ipv6:
+        if DNS in ipv6 and ipv6[DNS].id not in self.dns_query:
             self.dns_query[ipv6[DNS].id] = { "query": ipv6[DNS], "response": None, "tx_time": time.time_ns(), "rx_time": None }
 
     def rx_callback(self, ipv6: IPv6):
         ethernet_frame = (Ether() / ipv6).build()
         self.rx.append(Ether(ethernet_frame))
-
+        if DNS not in ipv6:
+            return
+        if ipv6[DNS].id not in self.dns_query:
+            return
+        else:
+            self.dns_query[ipv6[DNS].id]
         while next_packet := analyze_and_create_next_packet(self, self.dns_query[ipv6[DNS].id], ipv6):
             self.send(next_packet)
             if self.exit_next:
@@ -141,7 +153,8 @@ def analyze_and_create_next_packet(pdm_handler:PDMHandler, q_details: dict, ipv6
                     return packet_C(ipv6, tx - rx)
 
 
-lo = NetworkAdaptar("lo")
+# lo = NetworkAdaptar("lo")
+lo = NetworkAdaptar("enX0")
 pdm_handler = PDMHandler(lo)
 lo.listen(
     callback = pdm_handler,
