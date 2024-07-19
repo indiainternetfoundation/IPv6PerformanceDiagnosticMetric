@@ -137,3 +137,22 @@ def hex_dump(packet):
         print(f"{format(b, '#04x')[2:]} ", end="")
         i+=1
     print()
+
+def print_pdm(packet):
+    if IPv6ExtHdrDestOpt in packet:
+        exthdr_destop = packet[IPv6ExtHdrDestOpt]
+        for option in exthdr_destop.options:
+            if option.otype == 15:
+                if type(option.optdata) is IPv6ExtHdrPerformanceDiagnosticMetrics:
+                    pdm = option.optdata
+                else:
+                    pdm = IPv6ExtHdrPerformanceDiagnosticMetrics(option.optdata)
+                # print(pdm.__repr__())
+                print(  f"[i] <IPv6ExtHdrPerformanceDiagnosticMetrics " \
+                      f"\n[ ] \tscaledtlr={hex(pdm.scaledtlr)} " \
+                      f"\n[ ] \tscaledtls={hex(pdm.scaledtls)} " \
+                      f"\n[ ] \tpsntp={hex(pdm.psntp)} " \
+                      f"\n[ ] \tpsnlr={hex(pdm.psnlr)} " \
+                      f"\n[ ] \tdeltatlr={hex(pdm.deltatlr)} " \
+                      f"\n[ ] \tdeltatls={hex(pdm.deltatls)} " \
+                       "\n[ ] >")

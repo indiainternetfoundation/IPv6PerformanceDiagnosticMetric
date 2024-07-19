@@ -3,8 +3,8 @@ from pdm_exthdr import *
 
 # DST = "::1"
 # SRC  =  "2406:da1a:8e8:e8f4:9959:7a8b:38d6:c1dc"
-# DST = "2406:da1a:8e8:e805:6d97:b1b6:6232:ff90"
-DST = "fe80::f8:39ff:fed4:34cf%enX0"
+DST = "fe80::af:c4ff:fe5e:2bf5%enX0"
+# DST = "fe80::f8:39ff:fed4:34cf%enX0"
 
 def countBits(n):
     count = 0;
@@ -64,12 +64,12 @@ def packet_C(packet_B, delta_ns):
             )
         )
     )
-    print(_ipv6_pdm_destination_option.options[0].optdata.__repr__())
+    # print(_ipv6_pdm_destination_option.options[0].optdata.__repr__())
 
     _dnsq = DNS(id=121, rd=1, qd=DNSQR(qname='example.com', qtype="A"))
 
-    # return _ip / _ipv6_pdm_destination_option / UDP() / _dnsq
-    return _ip / _ipv6_pdm_destination_option
+    return _ip / _ipv6_pdm_destination_option / UDP() # / _dnsq
+    # return _ip / _ipv6_pdm_destination_option
 
 def packet_D(packet_C):
     pass

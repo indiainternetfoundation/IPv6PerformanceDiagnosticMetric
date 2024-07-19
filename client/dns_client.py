@@ -71,17 +71,30 @@ class PDMHandler:
             self._has_setup_ = True
 
     def __call__(self, ethernet_frame):
+        print(f"[i] {'[ TX ]' if ethernet_frame in self.tx else '[ RX ]'} {ethernet_frame.summary()}")
         if ICMPv6DestUnreach in ethernet_frame:
             return
-        if DNS in ethernet_frame:
-            print(f"[i] {'[ TX ]' if ethernet_frame in self.tx else '[ RX ]'} {ethernet_frame.summary()}")
-        else:
-            return
+        # if DNS in ethernet_frame:
+        # else:
+            # return
         if ethernet_frame not in self.tx:
             ipv6 = ethernet_frame[IPv6]
             if DNS in ipv6:
+                # print(ipv6[DNS].show())
+                # print(ipv6[DNS].summary())
+                # print(ipv6[DNS].__repr__)
+                # print(ipv6[DNS].qd)
+                # print(ipv6[DNS].an)
+
+                # txt = None
+                # while txt != "exit":
+                #     txt = input(">>>")
+                #     print(eval(txt))
+
                 if DNSRR in ipv6:
+                    # print("Breakpoint D")
                     if ipv6[DNS].id in self.dns_query:
+                        # print("Breakpoint F")
                         print(f"[i] Found DNS Response for Query Id {ipv6[DNS].id}, i.e. for domain `{ipv6[DNS].qd.qname}`")
                         self.dns_query[ipv6[DNS].id]["response"] = ipv6[DNS][DNSRR]
                         self.dns_query[ipv6[DNS].id]["rx_time"] = time.time_ns()  # Takes a lot of time
@@ -94,7 +107,8 @@ class PDMHandler:
 
     def send(self, ipv6: IPv6):
         ethernet_frame = (Ether() / ipv6).build()
-        # self.tx.append(Ether(ethernet_frame))
+        self.tx.append(Ether(ethernet_frame))
+        # self.tx.append(ethernet_frame)
         self.tx_callback(Ether(ethernet_frame)[IPv6])
         self.adaptar.sock.send( ethernet_frame )
 
@@ -112,6 +126,7 @@ class PDMHandler:
         else:
             self.dns_query[ipv6[DNS].id]
         while next_packet := analyze_and_create_next_packet(self, self.dns_query[ipv6[DNS].id], ipv6):
+            # print("Sending Packet ...")
             self.send(next_packet)
             if self.exit_next:
                 exit(0)
@@ -137,6 +152,7 @@ def analyze_and_create_next_packet(pdm_handler:PDMHandler, q_details: dict, ipv6
                         f"\n[ ] \tdeltatls={hex(pdm.deltatls)} " \
                     "\n[ ] >")
                     server_latency = _astons(pdm.deltatlr, pdm.scaledtlr)
+                    print(f"[i] {q_details['rx_time']=}, {q_details['tx_time']=}")
                     total_rtt = q_details['rx_time'] - q_details['tx_time']
                     print("[i] Delta Time Last Received : ", hex(server_latency))
                     print("[ ]                            ", server_latency, "ns")
@@ -149,7 +165,7 @@ def analyze_and_create_next_packet(pdm_handler:PDMHandler, q_details: dict, ipv6
                     print("[ ]                    ", (total_rtt - server_latency)/1000000000, "s")
                     tx = time.perf_counter_ns()
                     pdm_handler.exit_next = True
-                    print(packet_C(ipv6, tx - rx))
+                    # print(packet_C(ipv6, tx - rx))
                     return packet_C(ipv6, tx - rx)
 
 
