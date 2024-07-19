@@ -59,16 +59,11 @@ static unsigned int handle_rx_pkt( void *priv, struct sk_buff *skb, const struct
                 struct time tls_time = {
                     .delta = pdm_packet->deltatls,
                     .scale = pdm_packet->scaledtls
-
-                    // .delta = 36232, // 0x8D88
-                    // .scale = 40
                 };
                 uint64_t tls = _astons(tls_time);
-                // printk("tls : 0x%llx", tls);
-                // printk("      %llu", tls);
 
                 uint64_t rtt = rx - pop_report_reg(pdm_packet->psnlr);
-                // printk("rtt : 0x%llx", rtt);
+
                 uint64_t rtd = rtt-tls;
 
                 pr_info("Performance and Diagnostic Metrics//{'saddr': '%pI6', 'rtt': '%llu ns', 'rtd': '%llu ns'}", &ipv6_hdr(skb)->saddr, rtt, rtd);

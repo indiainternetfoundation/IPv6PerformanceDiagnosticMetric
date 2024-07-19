@@ -32,7 +32,7 @@ uint64_t _astons(struct time timedelta){
     ns_time <<= (timedelta.scale - 12);
 
     ns_time /= 100000;
-    ns_time *= 16*16;
+    ns_time *= 16*16*16;
     ns_time /= 10000;
     return ns_time;
 }
