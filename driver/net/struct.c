@@ -1,21 +1,5 @@
 #ifndef IPV6_STRUCT
 
-// Any IPv6 Extension Header will have this structure,
-// a `next-header` field, followed by a `header-length`
-// field. // Same as ipv6_opt_hdr
-struct exthdr {
-	u_int8_t    nh;
-	u_int8_t    hlen;
-} __attribute__((packed));
-
-// This is the same as `exthdr` as Destination Option
-// is also an Extension Header. This struct will be
-// made obsolete later.
-struct destopt_exthdr {
-	u_int8_t    nh;
-	u_int8_t    hlen;
-} __attribute__((packed));
-
 // This structure is for Options in Destination Option
 // Extension Header.
 struct destopt_op{
@@ -24,15 +8,28 @@ struct destopt_op{
 
 } __attribute__((packed));
 
+// This structure is for the IPv6 Performance and Diagnostic
+// Metrics (PDM) Destination Option for IPv6 Extension Headers.
+struct pdm{
+        u_int8_t	scaledtlr;
+        u_int8_t	scaledtls;
+
+        u_int16_t   psntp;
+        u_int16_t   psnlr;
+
+        u_int16_t   deltatlr;
+        u_int16_t   deltatls;
+
+}  __attribute__((packed));
+
+
 #define IPV6_STRUCT
 #endif
-
 
 #ifndef PROTO_STRUCT
 
 //DNS header structure
-struct dns_struct
-{
+struct dns_struct {
     unsigned short id; // identification number
 
     unsigned char rd :1; // recursion desired
