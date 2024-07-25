@@ -8,6 +8,8 @@ from socket import ntohs
 from pprint import pprint
 import time, threading
 
+from NetworkAdaptar import NetworkAdaptar
+
 def _astons(delta, scale):
     ns_time = delta
     ns_time = int(ns_time) << (scale - 8)
@@ -20,37 +22,6 @@ def _astons(delta, scale):
 def send_packet(packet : Ether):
     s = socket.socket(socket.AF_INET6, socket.SOCK_RAW, socket.IPPROTO_RAW)
 
-def threaded(func):
-    def wrapped_func(*args, **kwargs):
-        threaded_func = threading.Thread(target=func, args=args, kwargs=kwargs)
-        return threaded_func.start()
-    return wrapped_func
-
-class NetworkAdaptar:
-    ETH_P_ALL = 3
-    def __init__(self, iface = "lo", mtu = 1024):
-        self.sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETH_P_ALL))
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind((iface, 0))
-        self.listening = False
-        self.mtu = mtu
-
-    def __call__(self, ):
-        pass
-
-    @threaded
-    def listen(self, callback, filter = lambda x:x):
-        self.listening = True
-        try:
-            while self.listening:
-                data = self.sock.recv(self.mtu) # buffer size is 1024 bytes
-                _packet = Ether(data)
-                if IPv6 in _packet:
-                    if filter(_packet):
-                        callback(_packet)
-        except KeyboardInterrupt:
-            self.listening = False
-            sys.exit(0)
 
 class PDMHandler:
     def __init__(self, net:NetworkAdaptar, _psntp = 13):
@@ -110,7 +81,7 @@ class PDMHandler:
         self.tx.append(Ether(ethernet_frame))
         # self.tx.append(ethernet_frame)
         self.tx_callback(Ether(ethernet_frame)[IPv6])
-        self.adaptar.sock.send( ethernet_frame )
+        self.adaptar.send( ethernet_frame )
 
     def tx_callback(self, ipv6: IPv6):
         if DNS in ipv6 and ipv6[DNS].id not in self.dns_query:

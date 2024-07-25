@@ -3,8 +3,9 @@ from pdm_exthdr import *
 
 # DST = "::1"
 # SRC  =  "2406:da1a:8e8:e8f4:9959:7a8b:38d6:c1dc"
-DST = "fe80::af:c4ff:fe5e:2bf5%enX0"
+# DST = "fe80::af:c4ff:fe5e:2bf5%enX0"
 # DST = "fe80::f8:39ff:fed4:34cf%enX0"
+DST = "fe80::ba27:ebff:fe38:85fa"
 
 def countBits(n):
     count = 0;
