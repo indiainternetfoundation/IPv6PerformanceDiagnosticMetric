@@ -8,17 +8,11 @@ static unsigned int handle_rx_pkt( void *priv, struct sk_buff *skb, const struct
 
     uint64_t pdm_packet_pointer = 0;
 
-    printk("Breakpoint A");
-
     if(ipv6_pdm_hdr(skb, &pdm_packet_pointer, debug) != 0){
         struct pdm *pdm_packet = (struct pdm *) pdm_packet_pointer;
 
-        printk("Breakpoint B");
-
         if(debug)
             __dump_pdm(pdm_packet);
-
-        printk("Breakpoint C");
 
         switch(pdm_packet_type(pdm_packet)){
             case 0:
@@ -44,9 +38,9 @@ static unsigned int handle_rx_pkt( void *priv, struct sk_buff *skb, const struct
                 };
 
                 if (debug)
-                    pr_debug("Pushing PDM Entry (%d) at %llu : %llx", ntohs(pdm_packet->psntp), IDX(pdm_element.id_value, protocol_id.proto_type), pdm_element.time);
+                    pr_info("Pushing PDM Entry (%d) at %llu : %llx", ntohs(pdm_packet->psntp), IDX(pdm_element.id_value, protocol_id.proto_type), pdm_element.time);
                 if ( kreg_push( protocol_id.proto_id_value, protocol_id.proto_type, pdm_element, debug ) == -1) {
-                    pr_err("Unable to push the PDM as well as the protocol identifier in the kreg queue.");
+                    pr_info("Unable to push the PDM as well as the protocol identifier in the kreg queue.");
                 }
                 return NF_ACCEPT;
             case 1:
@@ -68,10 +62,11 @@ static unsigned int handle_rx_pkt( void *priv, struct sk_buff *skb, const struct
 
                 pr_info("Performance and Diagnostic Metrics//{'saddr': '%pI6', 'rtt': '%llu ns', 'rtd': '%llu ns'}", &ipv6_hdr(skb)->saddr, rtt, rtd);
                 return NF_ACCEPT;
+	    
             default:
                 return NF_ACCEPT;
         }
-
+	
 
         return NF_ACCEPT;
     }

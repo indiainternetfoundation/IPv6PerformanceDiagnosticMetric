@@ -2,9 +2,10 @@
 #include "struct.c"
 #include "dump.h"
 #include "pdm.h"
+// #include "ipv6_override.h"
 
 static unsigned int ipv6_pdm_hdr(struct sk_buff *skb, uint64_t *pdm_ptr, int debug){
-    unsigned int hdr_ptr;
+    unsigned int hdr_ptr = 0;
     if (ipv6_find_hdr(skb, &hdr_ptr, IPPROTO_DSTOPTS, NULL, NULL) < 0)
         return 0;
 

@@ -8,9 +8,9 @@
 #define DSTOPT_WIDTH 4;
 
 static uint8_t protocol_identifier(struct protoid *protocol_id, struct sk_buff *skb, uint8_t debug) {
-    uint32_t iphdr_offset;
-    uint32_t iphdr_flags;
-    uint16_t iphdr_fragoffset;
+    uint32_t iphdr_offset = 0;
+    uint32_t iphdr_flags = 0;
+    uint16_t iphdr_fragoffset = 0;
 
     // Check Protocol Type
     uint16_t proto_type = ipv6_find_hdr(skb, &iphdr_offset, -1, &iphdr_fragoffset, &iphdr_flags);
