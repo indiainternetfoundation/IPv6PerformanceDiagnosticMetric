@@ -5,7 +5,8 @@ from pdm_exthdr import *
 # SRC  =  "2406:da1a:8e8:e8f4:9959:7a8b:38d6:c1dc"
 # DST = "fe80::af:c4ff:fe5e:2bf5%enX0"
 # DST = "fe80::f8:39ff:fed4:34cf%enX0"
-DST = "fe80::ba27:ebff:fe38:85fa"
+# DST = "fe80::ba27:ebff:fe38:85fa"
+# DST = "fe80::40:2fff:fec5:4707"
 
 def countBits(n):
     count = 0;
@@ -23,7 +24,7 @@ def _nstoas(delta_ns):
         scale += 1
     return atto_now, scale
 
-def packet_A(_psntp):
+def packet_A(_psntp, DST, query):
     _ip = IPv6()
     _ip.dst = DST
 
@@ -40,14 +41,14 @@ def packet_A(_psntp):
         )
     )
 
-    _dnsq = DNS(id=121, rd=1, qd=DNSQR(qname='example.com', qtype="A"))
+    _dnsq = DNS(id=121, rd=1, qd=query)
 
     return _ip / _ipv6_pdm_destination_option / UDP() / _dnsq
 
 def packet_B(packet_A):
     pass
 
-def packet_C(packet_B, delta_ns):
+def packet_C(packet_B, delta_ns, DST):
     _pdm = IPv6ExtHdrPerformanceDiagnosticMetrics( packet_B.options[0].optdata )
     delta, scale = _nstoas(delta_ns)
     _ip = IPv6()

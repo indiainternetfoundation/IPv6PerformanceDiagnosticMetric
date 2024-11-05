@@ -14,11 +14,12 @@ def threaded(func):
 class NetworkAdaptar:
     ETH_P_ALL = 3
     def __init__(self, iface = "lo", mtu = 1024):
-        print(platform.system())
+        # print(platform.system())
 
         if platform.system() == "Linux":
             # self.sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETH_P_ALL))
-            self.sock = socket.socket(socket.AF_INET6, socket.SOCK_RAW, socket.htons(self.ETH_P_ALL))
+            # self.sock = socket.socket(socket.AF_INET6, socket.SOCK_RAW, socket.htons(self.ETH_P_ALL))
+            self.sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(self.ETH_P_ALL))
             self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.sock.bind((iface, 0))
 

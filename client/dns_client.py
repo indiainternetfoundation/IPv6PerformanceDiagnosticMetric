@@ -1,6 +1,6 @@
 # Processing time too much!!!
 
-from scapy.all import UDP, IPv6, ICMPv6DestUnreach
+from scapy.all import UDP, IPv6, ICMPv6DestUnreach, DNSQR
 from pdm_exthdr import *
 from packet_utils import *
 from struct import unpack
@@ -9,6 +9,9 @@ from pprint import pprint
 import time, threading
 
 from NetworkAdaptar import NetworkAdaptar
+
+import click
+
 
 def _astons(delta, scale):
     ns_time = delta
@@ -24,7 +27,7 @@ def send_packet(packet : Ether):
 
 
 class PDMHandler:
-    def __init__(self, net:NetworkAdaptar, _psntp = 13):
+    def __init__(self, net:NetworkAdaptar, query:DNSQR, dns_server:str = "::1", _psntp:int = 13):
         self._psntp = _psntp
         self.tx = []
         self.rx = []
@@ -33,16 +36,19 @@ class PDMHandler:
         self.adaptar = net
         self.exit_next = False
 
+        self.query = query
+        self.dst = dns_server
+
     def __setup__(self):
         if not self._has_setup_:
             print("[i] Sending DNS Query Packet along with PDM Header.")
-            packet = packet_A(self._psntp)
+            packet = packet_A(self._psntp, self.dst, self.query)
             # hex_dump(packet.build())
             self.send(packet)
             self._has_setup_ = True
 
     def __call__(self, ethernet_frame):
-        print(f"[i] {'[ TX ]' if ethernet_frame in self.tx else '[ RX ]'} {ethernet_frame.summary()}")
+        # print(f"[i] {'[ TX ]' if ethernet_frame in self.tx else '[ RX ]'} {ethernet_frame.summary()}")
         if ICMPv6DestUnreach in ethernet_frame:
             return
         # if DNS in ethernet_frame:
@@ -66,7 +72,7 @@ class PDMHandler:
                     # print("Breakpoint D")
                     if ipv6[DNS].id in self.dns_query:
                         # print("Breakpoint F")
-                        print(f"[i] Found DNS Response for Query Id {ipv6[DNS].id}, i.e. for domain `{ipv6[DNS].qd.qname}`")
+                        # print(f"[i] Found DNS Response for Query Id {ipv6[DNS].id}, i.e. for domain `{ipv6[DNS].qd.qname}`")
                         self.dns_query[ipv6[DNS].id]["response"] = ipv6[DNS][DNSRR]
                         self.dns_query[ipv6[DNS].id]["rx_time"] = time.time_ns()  # Takes a lot of time
                                                                                   # before recording rx time
@@ -96,16 +102,14 @@ class PDMHandler:
             return
         else:
             self.dns_query[ipv6[DNS].id]
-        while next_packet := analyze_and_create_next_packet(self, self.dns_query[ipv6[DNS].id], ipv6):
+        while next_packet := analyze_and_create_next_packet(self, self.dns_query[ipv6[DNS].id], ipv6, self.dst):
             # print("Sending Packet ...")
             self.send(next_packet)
             if self.exit_next:
                 exit(0)
 
 
-
-
-def analyze_and_create_next_packet(pdm_handler:PDMHandler, q_details: dict, ipv6: IPv6):
+def analyze_and_create_next_packet(pdm_handler:PDMHandler, q_details: dict, ipv6: IPv6, server: str):
     rx = time.perf_counter_ns()
     if ipv6:
         if IPv6ExtHdrDestOpt in ipv6:
@@ -114,40 +118,70 @@ def analyze_and_create_next_packet(pdm_handler:PDMHandler, q_details: dict, ipv6
                 if option.otype == 15:
                     pdm = IPv6ExtHdrPerformanceDiagnosticMetrics(option.optdata)
                     # print(pdm.__repr__())
-                    print(f"[i] <IPv6ExtHdrPerformanceDiagnosticMetrics " \
-                        f"\n[ ] \tscaledtlr={hex(pdm.scaledtlr)} " \
-                        f"\n[ ] \tscaledtls={hex(pdm.scaledtls)} " \
-                        f"\n[ ] \tpsntp={hex(pdm.psntp)} " \
-                        f"\n[ ] \tpsnlr={hex(pdm.psnlr)} " \
-                        f"\n[ ] \tdeltatlr={hex(pdm.deltatlr)} " \
-                        f"\n[ ] \tdeltatls={hex(pdm.deltatls)} " \
-                    "\n[ ] >")
+                    # print(f"[i] <IPv6ExtHdrPerformanceDiagnosticMetrics " \
+                    #     f"\n[ ] \tscaledtlr={hex(pdm.scaledtlr)} " \
+                    #     f"\n[ ] \tscaledtls={hex(pdm.scaledtls)} " \
+                    #     f"\n[ ] \tpsntp={hex(pdm.psntp)} " \
+                    #     f"\n[ ] \tpsnlr={hex(pdm.psnlr)} " \
+                    #     f"\n[ ] \tdeltatlr={hex(pdm.deltatlr)} " \
+                    #     f"\n[ ] \tdeltatls={hex(pdm.deltatls)} " \
+                    # "\n[ ] >")
+                    print("[ ]")
+                    print("[i] Received IPv6 Performance Diagnostic Metrics Extension Header")
+                    print(f"[i] ┌─── IPv6ExtHdrPerformanceDiagnosticMetrics \n" \
+                          f"    │    \tscaledtlr : {hex(pdm.scaledtlr)} \n" \
+                          f"    │    \tscaledtls : {hex(pdm.scaledtls)} \n" \
+                          f"    │    \tpsntp : {hex(pdm.psntp)} \n" \
+                          f"    │    \tpsnlr : {hex(pdm.psnlr)} \n" \
+                          f"    │    \tdeltatlr : {hex(pdm.deltatlr)} \n" \
+                          f"    │    \tdeltatls : {hex(pdm.deltatls)} \n" \
+                          f"    │              │ \n" \
+                          f"    └──────────────┘ ")
+                    print("[ ]")
                     server_latency = _astons(pdm.deltatlr, pdm.scaledtlr)
-                    print(f"[i] {q_details['rx_time']=}, {q_details['tx_time']=}")
+                    # print(f"[i] {q_details['rx_time']=}, {q_details['tx_time']=}")
                     total_rtt = q_details['rx_time'] - q_details['tx_time']
-                    print("[i] Delta Time Last Received : ", hex(server_latency))
-                    print("[ ]                            ", server_latency, "ns")
-                    print("[ ]                            ", server_latency/1000000000, "s")
-                    print("[i] RX : ", q_details['rx_time'], "ns")
-                    print("[i] TX : ", q_details['tx_time'], "ns")
+                    print("[i] Server Latency : ", hex(server_latency))
+                    print("[ ]                  ", server_latency, "ns")
+                    print("[ ]                  ", server_latency/1000000000, "s")
+                    # print("[i] RX : ", q_details['rx_time'], "ns")
+                    # print("[i] TX : ", q_details['tx_time'], "ns")
                     print("[i] Round Trip Time  : ", total_rtt, "ns")
                     print("[ ]                    ", (total_rtt)/1000000000, "s")
                     print("[i] Round Trip Delay : ", total_rtt - server_latency, "ns")
                     print("[ ]                    ", (total_rtt - server_latency)/1000000000, "s")
+                    print("[i]", ipv6[UDP])
                     tx = time.perf_counter_ns()
                     pdm_handler.exit_next = True
                     # print(packet_C(ipv6, tx - rx))
-                    return packet_C(ipv6, tx - rx)
+                    return packet_C(ipv6, tx - rx, server)
 
 
-# lo = NetworkAdaptar("lo")
-lo = NetworkAdaptar("enX0")
-pdm_handler = PDMHandler(lo)
-lo.listen(
-    callback = pdm_handler,
-    filter = lambda x: IPv6 in x
-)
-print("[ ] Listening...")
-pdm_handler.__setup__()
+
+@click.command()
+@click.option('--dns', default="::1", help='The IPv6 DNS Server.')
+@click.option('--q', default="A", help='Query Type')
+@click.option('--iface', default="lo", help='The Network Interface to use.')
+@click.argument("domain")
+def main(dns, q, iface, domain, ):
+
+    # iface = NetworkAdaptar("lo")
+    # iface = NetworkAdaptar("enX0")
+    iface = NetworkAdaptar(iface)
+    pdm_handler = PDMHandler(
+        iface,
+        DNSQR(qname=domain, qtype=q),
+        dns
+    )
+
+    iface.listen(
+        callback = pdm_handler,
+        filter = lambda x: IPv6 in x
+    )
+    # print("[ ] Listening...")
+    pdm_handler.__setup__()
+
+if __name__ == "__main__":
+    main()
 
 
