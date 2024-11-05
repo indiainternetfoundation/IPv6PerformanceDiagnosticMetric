@@ -126,9 +126,9 @@ def analyze_and_create_next_packet(pdm_handler:PDMHandler, q_details: dict, ipv6
                     #     f"\n[ ] \tdeltatlr={hex(pdm.deltatlr)} " \
                     #     f"\n[ ] \tdeltatls={hex(pdm.deltatls)} " \
                     # "\n[ ] >")
-                    print("[ ]")
+                    print("    ")
                     print("[i] Received IPv6 Performance Diagnostic Metrics Extension Header")
-                    print(f"[i] ┌─── IPv6ExtHdrPerformanceDiagnosticMetrics \n" \
+                    print(f"    ┌─── IPv6ExtHdrPerformanceDiagnosticMetrics \n" \
                           f"    │    \tscaledtlr : {hex(pdm.scaledtlr)} \n" \
                           f"    │    \tscaledtls : {hex(pdm.scaledtls)} \n" \
                           f"    │    \tpsntp : {hex(pdm.psntp)} \n" \
@@ -137,19 +137,22 @@ def analyze_and_create_next_packet(pdm_handler:PDMHandler, q_details: dict, ipv6
                           f"    │    \tdeltatls : {hex(pdm.deltatls)} \n" \
                           f"    │              │ \n" \
                           f"    └──────────────┘ ")
-                    print("[ ]")
+                    print("    ")
                     server_latency = _astons(pdm.deltatlr, pdm.scaledtlr)
                     # print(f"[i] {q_details['rx_time']=}, {q_details['tx_time']=}")
                     total_rtt = q_details['rx_time'] - q_details['tx_time']
                     print("[i] Server Latency : ", hex(server_latency))
-                    print("[ ]                  ", server_latency, "ns")
-                    print("[ ]                  ", server_latency/1000000000, "s")
+                    print("                     ", server_latency, "ns")
+                    print("                     ", server_latency/1000000000, "s")
+                    print("    ")
                     # print("[i] RX : ", q_details['rx_time'], "ns")
                     # print("[i] TX : ", q_details['tx_time'], "ns")
                     print("[i] Round Trip Time  : ", total_rtt, "ns")
-                    print("[ ]                    ", (total_rtt)/1000000000, "s")
+                    print("                       ", (total_rtt)/1000000000, "s")
+                    print("    ")
                     print("[i] Round Trip Delay : ", total_rtt - server_latency, "ns")
-                    print("[ ]                    ", (total_rtt - server_latency)/1000000000, "s")
+                    print("                       ", (total_rtt - server_latency)/1000000000, "s")
+                    print("    ")
                     print("[i]", ipv6[UDP])
                     tx = time.perf_counter_ns()
                     pdm_handler.exit_next = True
