@@ -17,14 +17,18 @@ class NetworkAdaptar:
         # print(platform.system())
 
         if platform.system() == "Linux":
-            # self.sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETH_P_ALL))
-            # self.sock = socket.socket(socket.AF_INET6, socket.SOCK_RAW, socket.htons(self.ETH_P_ALL))
-            self.sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(self.ETH_P_ALL))
-            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.sock.bind((iface, 0))
+            try:
+                self.sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(self.ETH_P_ALL))
+                self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self.sock.bind((iface, 0))
+            except:
+                self.sock = socket.socket(socket.AF_INET6, socket.SOCK_RAW, socket.htons(self.ETH_P_ALL))
+                self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self.sock.bind((iface, 0))
 
         elif (platform.system() == "Darwin") or (platform.system() == "Windows"):
             self.sock = None
+            raise NotImplementedError()
 
 
         self.listening = False
