@@ -1,6 +1,6 @@
 # Processing time too much!!!
 
-from scapy.all import UDP, IPv6, ICMPv6DestUnreach, DNSQR
+from scapy.all import UDP, IPv6, ICMPv6DestUnreach, DNSRR, DNSQR, Ether, DNS
 from pdm_exthdr import *
 from packet_utils import *
 from struct import unpack
