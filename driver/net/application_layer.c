@@ -22,7 +22,7 @@ static uint8_t protocol_identifier(struct protoid *protocol_id, struct sk_buff *
             udp = (struct udphdr *)protocol_id->proto;
             if(debug)
                 __dump_udphdr(udp);
-            if (htons(udp->source) == 53){
+            if (htons(udp->source) == 53 || htons(udp->dest) == 53){
                 // DNS Packet
                 protocol_id->proto = protocol_id->proto + sizeof(struct udphdr);
                 protocol_id->proto_type = IPPROTO_DNS;
